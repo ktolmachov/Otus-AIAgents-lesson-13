@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.join(__dirname, '..');
@@ -17,12 +17,24 @@ export function getDb() {
   return db;
 }
 
+function rowidToNumber(rid) {
+  if (typeof rid === 'bigint') return Number(rid);
+  return rid;
+}
+
+/** Last insert rowid from `StatementSync.run()` (number or BigInt). */
+export function lastInsertRowid(result) {
+  return rowidToNumber(result.lastInsertRowid);
+}
+
 /** Creates `data/articles.db` and tables per adr.md (T-003). */
 export function initDb() {
   fs.mkdirSync(dataDir, { recursive: true });
-  db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+  db = new DatabaseSync(dbPath, { enableForeignKeyConstraints: true });
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA synchronous = NORMAL;
+  `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS articles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
